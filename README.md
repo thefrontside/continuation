@@ -6,7 +6,7 @@ Delimited continuations for JavaScript
 ## Synopsis
 
 ``` typescript
-import { evaluate } from "https://deno.land/x/continuation/mod.ts
+import { evaluate } from "https://deno.land/x/continuation/mod.ts"
 
 evaluate(function*() {
   for (let i = 5; i > 0; i--) {
