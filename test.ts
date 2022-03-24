@@ -56,4 +56,25 @@ Deno.test("continuation", async (t) => {
     assertEquals(10, end);
     assertEquals(100, result2);
   });
+
+  await t.step("each continuation point only fails once", () => {
+    let bing = 0;
+    let boom = evaluate<K<void>>(function*() {
+      yield* shift(function*(k) {
+        return k;
+      });
+      throw new Error(`bing ${++bing}`);
+    });
+
+    try {
+      boom();
+    } catch (e) {
+      assertEquals('bing 1', e.message);
+    }
+    try {
+      boom();
+    } catch (e) {
+      assertEquals('bing 1', e.message);
+    }
+  })
 });

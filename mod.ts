@@ -38,17 +38,24 @@ export function evaluate<T>(block: () => Block, done: K = v => v, value?: unknow
     if (control.type === 'reset') {
       return evaluate(control.block, v => evaluate(() => cont, done, v));
     } else {
-      let continued = false;
-      let result: any;
-      let k: K = value => {
-        if (!continued) {
-          continued = true;
-          return result = evaluate(() => cont, v => v, value)
-        } else {
-          return result;
-        }
-      };
+      let k: K = oneshot(value => evaluate(() => cont, v => v, value));
       return evaluate(() => control.block(k), done);
     }
   }
+}
+
+function oneshot<T, R>(fn: K<T,R>): K<T,R> {
+  let call: () => R;
+
+  return (input: T extends void ? void : T) => {
+    if (call == null) {
+      try {
+        let result = fn(input) as R;
+        call = () => result
+      } catch (error) {
+        call = () => { throw error; }
+      }
+    }
+    return call();
+  };
 }
