@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.129.0/testing/asserts.ts";
-import { evaluate, shift, K } from "./mod.ts";
+import { evaluate, shift, reset, K } from "./mod.ts";
 
 Deno.test("continuation", async (t) => {
   await t.step("evaluates synchronous values synchronously", () => {
@@ -78,3 +78,33 @@ Deno.test("continuation", async (t) => {
     }
   })
 });
+
+Deno.test("early exit recursion", () => {
+  function* times([first, ...rest]: number[]): any {
+    if (first === 0) {
+      yield* shift(function*() {
+        return 0;
+      })
+    } else if (first == null) {
+      return 1;
+    } else {
+      return first * (yield* times(rest));
+    }
+  }
+
+  assertEquals(0, evaluate(() => times([8,0,5,2,3])));
+  assertEquals(240, evaluate(() => times([8,1,5,2,3])));
+})
+
+Deno.test("reseting", () => {
+
+  let { k } = evaluate<{k: K }>(function*() {
+    let k = yield* reset(function*() {
+      let result = yield* shift(function*(k) { return k; });
+      yield* shift(function*() { return result * 2 });
+    });
+    return { k };
+  })
+  assertEquals('function', typeof k);
+  assertEquals(10, k(5));
+})

@@ -8,7 +8,6 @@ export interface K<T = any, R = any> {
   (value: T extends void ? void : T): R;
 }
 
-
 export type Control =
   {
     type: 'shift',
@@ -27,35 +26,37 @@ export function* shift<T>(block: (k: K<T>) => Block): Block<T> {
   return yield { type: 'shift', block };
 }
 
-export function evaluate<T>(block: () => Block, done: K = v => v, value?: unknown): T {
-  let prog = block()[Symbol.iterator]();
-  let next = prog.next(value);
-  if (next.done) {
-    return done(next.value);
-  } else {
-    let control = next.value;
-    let cont = ({ [Symbol.iterator]: () => prog });
-    if (control.type === 'reset') {
-      return evaluate(control.block, v => evaluate(() => cont, done, v));
+export function evaluate<T>(block: () => Block, value?: any): T {
+  let stack = [block()];
+  for (let current = stack.pop(); current; current = stack.pop()) {
+    let prog = current[Symbol.iterator]();
+    let next = prog.next(value);
+    if (next.done) {
+      value = next.value;
     } else {
-      let k: K = oneshot(value => evaluate(() => cont, v => v, value));
-      return evaluate(() => control.block(k), done);
+      let cont = ({ [Symbol.iterator]: () => prog });
+      let control = next.value;
+      if (control.type === 'reset') {
+        stack.push(cont);
+        stack.push(control.block())
+      } else {
+        let k: K = oneshot(value => evaluate(() => cont, value));
+        stack.push(control.block(k));
+      }
     }
   }
+  return value;
 }
 
 function oneshot<T, R>(fn: K<T,R>): K<T,R> {
-  let call: () => R;
-
-  return (input: T extends void ? void : T) => {
-    if (call == null) {
-      try {
-        let result = fn(input) as R;
-        call = () => result
-      } catch (error) {
-        call = () => { throw error; }
-      }
+  let continued = false;
+  let result: any;
+  return value => {
+    if (!continued) {
+      continued = true;
+      return result = fn(value);
+    } else {
+      return result;
     }
-    return call();
-  };
+  }
 }
