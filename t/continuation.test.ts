@@ -1,5 +1,5 @@
-import { assertEquals } from "https://deno.land/std@0.129.0/testing/asserts.ts";
-import { evaluate, shift, reset, K } from "./mod.ts";
+import { assertEquals } from "./asserts.ts";
+import { evaluate, shift, reset, K } from "../mod.ts";
 
 Deno.test("continuation", async (t) => {
   await t.step("evaluates synchronous values synchronously", () => {

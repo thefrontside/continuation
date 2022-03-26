@@ -11,7 +11,7 @@ export interface K<T = any, R = any> {
 export type Control =
   {
     type: 'shift',
-    block(k: K): Block
+    block(resolve: K, reject: K<Error>): Block
   } |
   {
     type: 'reset',
@@ -22,26 +22,37 @@ export function* reset<T>(block: () => Block): Block<T> {
   return yield { type: 'reset', block };
 }
 
-export function* shift<T>(block: (k: K<T>) => Block): Block<T> {
+export function* shift<T>(block: (resolve: K<T>, reject: K<Error>) => Block): Block<T> {
   return yield { type: 'shift', block };
 }
 
-export function evaluate<T>(block: () => Block, value?: any): T {
+export function evaluate<T>(block: () => Block, getNext = $next()): T {
   let stack = [block()];
+  let value: any;
   for (let current = stack.pop(); current; current = stack.pop()) {
     let prog = current[Symbol.iterator]();
-    let next = prog.next(value);
-    if (next.done) {
-      value = next.value;
-    } else {
-      let cont = ({ [Symbol.iterator]: () => prog });
-      let control = next.value;
-      if (control.type === 'reset') {
-        stack.push(cont);
-        stack.push(control.block())
+    try {
+      let next = getNext(prog);
+      getNext = (iter) => iter.next(value);
+      if (next.done) {
+        value = next.value;
       } else {
-        let k: K = oneshot(value => evaluate(() => cont, value));
-        stack.push(control.block(k));
+        let cont = ({ [Symbol.iterator]: () => prog });
+        let control = next.value;
+        if (control.type === 'reset') {
+          stack.push(cont);
+          stack.push(control.block())
+        } else {
+          let resolve: K = oneshot(value => evaluate(() => cont, $next(value)));
+          let reject: K<Error> = oneshot(error => evaluate(() => cont, $throw(error)))
+          stack.push(control.block(resolve, reject));
+        }
+      }
+    } catch (error) {
+      if (!stack.length) {
+        throw error;
+      } else {
+        getNext = $throw(error);
       }
     }
   }
@@ -58,5 +69,14 @@ function oneshot<T, R>(fn: K<T,R>): K<T,R> {
     } else {
       return result;
     }
+  }
+}
+
+const $next = (value?: any) => (i: Iterator<Control>) => i.next(value)
+const $throw = (error: Error) => (i: Iterator<Control>) => {
+  if (i.throw) {
+    return i.throw(error);
+  } else {
+    throw error;
   }
 }
