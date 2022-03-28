@@ -1,4 +1,7 @@
 {
+  "tasks": {
+    "npm:build": "deno run -A npm.ts"
+  },
   "lint": {
     "rules": {
       "exclude": ["prefer-const", "require-yield"]
