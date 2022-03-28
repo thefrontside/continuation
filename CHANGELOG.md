@@ -1,6 +1,7 @@
 # Changelog
 
 ## \[0.0.2]
+- include sourcemaps for npm distribution
 - support iterative evaluation instead of recursive evaluation. This means that
 stacktraces are considerably smaller whenever an evaluation resumes
 

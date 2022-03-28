@@ -11,7 +11,8 @@ await build({
   test: false,
   typeCheck: false,
   compilerOptions: {
-    target: "ES2020"
+    target: "ES2020",
+    sourceMap: true,
   },
   package: {
     // package.json properties
