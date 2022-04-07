@@ -33,3 +33,5 @@ await build({
     },
   },
 });
+
+await Deno.copyFile("README.md", "npm/README.md");
