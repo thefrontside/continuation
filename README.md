@@ -2,10 +2,18 @@
 
 Delimited continuations for JavaScript
 
+## Install
+
+- **deno** https://deno.land/x/continuation/mod.ts
+- **npm** [@frontside/continuation](https://www.npmjs.com/package/@frontside/continuation)
+
 ## Synopsis
 
 ```typescript
+//deno
 import { evaluate } from "https://deno.land/x/continuation/mod.ts";
+//npm
+import { evaluate } from "@frontside/continuation";
 
 evaluate(function* () {
   for (let i = 5; i > 0; i--) {
