@@ -1,5 +1,8 @@
 # Changelog
 
+## \[0.1.1]
+- include README.md in NPM release
+
 ## \[0.1.0]
 - add support for raising errors within a continuation
 
