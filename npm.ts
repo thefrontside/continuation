@@ -6,7 +6,7 @@ await build({
   entryPoints: ["./mod.ts"],
   outDir: "./npm",
   shims: {
-    deno: false
+    deno: false,
   },
   test: false,
   typeCheck: false,
@@ -29,7 +29,7 @@ await build({
       url: "https://github.com/thefrontside/continuation/issues",
     },
     engines: {
-      node: ">= 14"
-    }
+      node: ">= 14",
+    },
   },
 });

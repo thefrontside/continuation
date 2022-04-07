@@ -1,5 +1,5 @@
 import { assertEquals } from "./asserts.ts";
-import { evaluate, shift, reset, K } from "../mod.ts";
+import { evaluate, K, reset, shift } from "../mod.ts";
 
 Deno.test("continuation", async (t) => {
   await t.step("evaluates synchronous values synchronously", () => {
@@ -24,12 +24,12 @@ Deno.test("continuation", async (t) => {
 
   await t.step("each continuation point function only resumes once", () => {
     let beginning, middle, end;
-    let next = evaluate<K<string, K<number>>>(function*() {
+    let next = evaluate<K<string, K<number>>>(function* () {
       beginning = true;
-      middle = yield* shift(function*(k) {
+      middle = yield* shift(function* (k) {
         return k;
-      })
-      end = yield* shift<number>(function*(k) {
+      });
+      end = yield* shift<number>(function* (k) {
         return k;
       });
       return end * 10;
@@ -41,7 +41,7 @@ Deno.test("continuation", async (t) => {
     let last = next("reached middle");
     assertEquals("reached middle", middle);
     assertEquals(undefined, end);
-    assertEquals('function', typeof last);
+    assertEquals("function", typeof last);
 
     let second = next("continue");
     assertEquals("reached middle", middle);
@@ -59,8 +59,8 @@ Deno.test("continuation", async (t) => {
 
   await t.step("each continuation point only fails once", () => {
     let bing = 0;
-    let boom = evaluate<K<void>>(function*() {
-      yield* shift(function*(k) {
+    let boom = evaluate<K<void>>(function* () {
+      yield* shift(function* (k) {
         return k;
       });
       throw new Error(`bing ${++bing}`);
@@ -69,22 +69,22 @@ Deno.test("continuation", async (t) => {
     try {
       boom();
     } catch (e) {
-      assertEquals('bing 1', e.message);
+      assertEquals("bing 1", e.message);
     }
     try {
       boom();
     } catch (e) {
-      assertEquals('bing 1', e.message);
+      assertEquals("bing 1", e.message);
     }
-  })
+  });
 });
 
 Deno.test("early exit recursion", () => {
   function* times([first, ...rest]: number[]): any {
     if (first === 0) {
-      yield* shift(function*() {
+      yield* shift(function* () {
         return 0;
-      })
+      });
     } else if (first == null) {
       return 1;
     } else {
@@ -92,19 +92,22 @@ Deno.test("early exit recursion", () => {
     }
   }
 
-  assertEquals(0, evaluate(() => times([8,0,5,2,3])));
-  assertEquals(240, evaluate(() => times([8,1,5,2,3])));
-})
+  assertEquals(0, evaluate(() => times([8, 0, 5, 2, 3])));
+  assertEquals(240, evaluate(() => times([8, 1, 5, 2, 3])));
+});
 
 Deno.test("reseting", () => {
-
-  let { k } = evaluate<{k: K }>(function*() {
-    let k = yield* reset(function*() {
-      let result = yield* shift(function*(k) { return k; });
-      yield* shift(function*() { return result * 2 });
+  let { k } = evaluate<{ k: K }>(function* () {
+    let k = yield* reset(function* () {
+      let result = yield* shift(function* (k) {
+        return k;
+      });
+      yield* shift(function* () {
+        return result * 2;
+      });
     });
     return { k };
-  })
-  assertEquals('function', typeof k);
+  });
+  assertEquals("function", typeof k);
   assertEquals(10, k(5));
-})
+});
