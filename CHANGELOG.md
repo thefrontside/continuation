@@ -1,5 +1,8 @@
 # Changelog
 
+## \[0.1.2]
+- re-release since npm and deno.land had different versions
+
 ## \[0.1.1]
 - include README.md in NPM release
 
