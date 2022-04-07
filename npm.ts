@@ -17,7 +17,7 @@ await build({
   package: {
     // package.json properties
     name: "@frontside/continuation",
-    version: "0.1.0",
+    version: "0.1.1",
     description: "Delimited continuations for JavaScript",
     license: "MIT",
     repository: {
