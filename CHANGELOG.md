@@ -1,5 +1,9 @@
 # Changelog
 
+## \[0.1.3]
+
+- debugging cross release to both deno.land/x and npm, do not use.
+
 ## \[0.1.2]
 
 - re-release since npm and deno.land had different versions
