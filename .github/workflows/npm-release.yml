@@ -29,6 +29,13 @@ jobs:
         id: vars
         run: echo ::set-output name=version::$(echo ${{github.ref_name}} | sed 's/^v//')
 
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14.x
+          registry-url: https://registry.npmjs.org
+
       - name: Build
         run: deno task npm:build
         env:
