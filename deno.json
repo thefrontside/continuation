@@ -5,6 +5,14 @@
   "lint": {
     "rules": {
       "exclude": ["prefer-const", "require-yield"]
+    },
+    "files": {
+      "exclude": ["npm/"]
+    }
+  },
+  "fmt": {
+    "files": {
+      "exclude": ["README.md", "npm/"]
     }
   }
 }

@@ -1,5 +1,5 @@
 import { assertEquals } from "./asserts.ts";
-import { evaluate, K, reset, shift } from "../mod.ts";
+import { Computation, evaluate, K, reset, shift } from "../mod.ts";
 
 Deno.test("continuation", async (t) => {
   await t.step("evaluates synchronous values synchronously", () => {
@@ -80,9 +80,9 @@ Deno.test("continuation", async (t) => {
 });
 
 Deno.test("early exit recursion", () => {
-  function* times([first, ...rest]: number[]): any {
+  function* times([first, ...rest]: number[]): Computation<number> {
     if (first === 0) {
-      yield* shift(function* () {
+      return yield* shift(function* () {
         return 0;
       });
     } else if (first == null) {
