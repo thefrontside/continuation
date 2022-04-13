@@ -1,0 +1,41 @@
+# This workflow will install Deno then run Deno lint and test.
+# For more information see: https://github.com/denoland/setup-deno
+
+name: Release to NPM
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: setup deno
+        # uses: denoland/setup-deno@v1
+        uses: denoland/setup-deno@004814556e37c54a2f6e31384c9e18e983317366
+        with:
+          deno-version: v1.x
+
+      - name: Get Version
+        id: vars
+        run: echo ::set-output name=version::$(echo ${{github.ref_name}} | sed 's/^v//')
+
+      - name: Build
+        run: deno task npm:build
+        env:
+          NPM_VERSION: ${{steps.vars.outputs.version}}
+
+      - name: Publish
+        run: npm publish --access=public
+        working-directory: ./npm
+        env:
+          NPM_AUTH_TOKEN: ${{env.NPM_TOKEN}}
