@@ -1,6 +1,9 @@
 import { build, emptyDir } from "https://deno.land/x/dnt@0.17.0/mod.ts";
-
+import { assert } from "./t/asserts.ts";
 await emptyDir("./npm");
+
+let version = Deno.env.get("NPM_VERSION");
+assert(version, "NPM_VERSION is required to build npm package");
 
 await build({
   entryPoints: ["./mod.ts"],
@@ -17,7 +20,7 @@ await build({
   package: {
     // package.json properties
     name: "@frontside/continuation",
-    version: "0.1.2",
+    version,
     description: "Delimited continuations for JavaScript",
     license: "MIT",
     repository: {
