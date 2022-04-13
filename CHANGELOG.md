@@ -1,5 +1,10 @@
 # Changelog
 
+## \[0.1.4]
+
+- now that automatic cross releasing is working for both deno.land/x and
+npmjs.org, this has both release matching the exact same commit.
+
 ## \[0.1.3]
 
 - debugging cross release to both deno.land/x and npm, do not use.
