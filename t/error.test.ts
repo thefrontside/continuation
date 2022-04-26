@@ -1,85 +1,87 @@
 import { evaluate, K, reset, shift } from "../mod.ts";
 import { assertEquals, assertObjectMatch, assertThrows } from "./asserts.ts";
-const { test } = Deno;
+import { describe, it } from "./bdd.ts";
 
-test("error is raised from evaluate", () => {
-  assertThrows(
-    () =>
-      evaluate(function* () {
-        throw new Error("boom!");
-      }),
-    Error,
-    "boom!",
-  );
-});
-
-test("error is raised from a reset", () => {
-  assertThrows(
-    () =>
-      evaluate(function* () {
-        yield* reset(function* () {
+describe("error", () => {
+  it("is raised from evaluate", () => {
+    assertThrows(
+      () =>
+        evaluate(function* () {
           throw new Error("boom!");
-        });
-      }),
-    Error,
-    "boom!",
-  );
-});
+        }),
+      Error,
+      "boom!",
+    );
+  });
 
-test("error is raised from a shift", () => {
-  assertThrows(
-    () =>
+  it("is raised from a reset", () => {
+    assertThrows(
+      () =>
+        evaluate(function* () {
+          yield* reset(function* () {
+            throw new Error("boom!");
+          });
+        }),
+      Error,
+      "boom!",
+    );
+  });
+
+  it("is raised from a shift", () => {
+    assertThrows(
+      () =>
+        evaluate(function* () {
+          yield* reset(function* () {
+            yield* shift(function* () {
+              throw new Error("boom!");
+            });
+          });
+        }),
+      Error,
+      "boom!",
+    );
+  });
+
+  it("can be caught from a shift", () => {
+    assertObjectMatch(
       evaluate(function* () {
-        yield* reset(function* () {
-          yield* shift(function* () {
-            throw new Error("boom!");
+        try {
+          yield* reset(function* () {
+            yield* shift(function* () {
+              throw new Error("boom!");
+            });
           });
-        });
+        } catch (error) {
+          return error;
+        }
       }),
-    Error,
-    "boom!",
-  );
-});
+      { message: "boom!" },
+    );
+  });
 
-test("error can be caught from a shift", () => {
-  assertObjectMatch(
-    evaluate(function* () {
+  it("can be raised programatically from a shift", () => {
+    let reject = evaluate<K<Error>>(function* () {
       try {
-        yield* reset(function* () {
-          yield* shift(function* () {
-            throw new Error("boom!");
-          });
+        yield* shift(function* (_, reject) {
+          return reject;
         });
       } catch (error) {
-        return error;
+        return { caught: true, error };
       }
-    }),
-    { message: "boom!" },
-  );
-});
+    });
 
-test("raising an error", () => {
-  let reject = evaluate<K<Error>>(function* () {
-    try {
+    let error = new Error("boom!");
+
+    assertEquals({ caught: true, error }, reject(error));
+  });
+
+  it("blows up the caller if it is not caught inside the continuation", () => {
+    let reject = evaluate<K<Error>>(function* () {
       yield* shift(function* (_, reject) {
         return reject;
       });
-    } catch (error) {
-      return { caught: true, error };
-    }
-  });
-
-  let error = new Error("boom!");
-
-  assertEquals({ caught: true, error }, reject(error));
-});
-
-test("raising an error blows up on you if it is not caught", () => {
-  let reject = evaluate<K<Error>>(function* () {
-    yield* shift(function* (_, reject) {
-      return reject;
     });
-  });
 
-  assertThrows(() => reject(new Error("boom!")), Error, "boom!");
+    assertThrows(() => reject(new Error("boom!")), Error, "boom!");
+  });
 });

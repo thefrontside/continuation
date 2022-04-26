@@ -1,9 +1,11 @@
 # Changelog
 
+- migrate from Deno.test to BDD https://deno.com/blog/v1.21#bdd-style-testing
+
 ## \[0.1.4]
 
 - now that automatic cross releasing is working for both deno.land/x and
-npmjs.org, this has both release matching the exact same commit.
+  npmjs.org, this has both release matching the exact same commit.
 
 ## \[0.1.3]
 
