@@ -1,121 +1,207 @@
 // deno-lint-ignore-file no-explicit-any
 
-export interface Computation<T = any> {
-  [Symbol.iterator](): Iterator<Control, T, any>;
+interface ThunkNext<V = unknown> {
+  method: "next";
+  iterator: Iterator<Control, unknown, unknown>;
+  value: V;
+}
+
+interface ThunkThrow {
+  method: "throw";
+  caller?: Thunk;
+  iterator: Iterator<Control, unknown, unknown>;
+  error: Error;
+}
+
+type Thunk<V = unknown> = ThunkNext<V> | ThunkThrow;
+
+export interface Computation<T = any, C = Control> {
+  [Symbol.iterator](): Iterator<C, T, any>;
 }
 
 export interface Continuation<T = any, R = any> {
   (value: T): R;
 }
 
-function* _continue<T>(
-  block: (resolve: Continuation<T>, reject: Continuation<Error>) => Computation,
-  value?: T,
-): Computation<T> {
-  return yield { type: "continue", block, value };
+export interface ContinuationTail<T = any, R = any> extends Continuation<T, R> {
+  tail(value: T): void;
 }
 
-function* _throw(block: () => Computation, value: Error): Computation<Error> {
-  return yield { type: "throw", block, value };
+export function $next<V>(
+  t: Pick<ThunkNext<V>, "iterator" | "value">,
+): Thunk<V> {
+  return {
+    method: "next",
+    ...t,
+  };
 }
 
-export function* reset(block: () => Computation): Computation {
-  return yield* _continue(function* (resolve) {
-    resolve(undefined);
-    yield* block();
-  });
+export function $throw(
+  t: Pick<ThunkThrow, "iterator" | "error" | "caller">,
+): Thunk {
+  return {
+    method: "throw",
+    ...t,
+  };
+}
+
+export function* reset<T>(block: () => Computation): Computation<T> {
+  return yield { type: "reset", block };
 }
 
 export function* shift<T>(
   block: (resolve: Continuation<T>, reject: Continuation<Error>) => Computation,
 ): Computation<T> {
-  return yield* _continue<T>(block);
+  return yield { type: "shift", block };
 }
 
-export function evaluate<T>(block: () => Computation): T {
-  let stack = [block()];
+export function evaluate<T>(iterator: () => Computation): T {
+  let stack = [
+    $next({ iterator: iterator()[Symbol.iterator](), value: undefined }),
+  ];
   return reduce(stack);
 }
 
-function reduce<T>(initStack: Computation[]): T {
+function reduce<T>(initStack: Thunk[]): T {
   let stack = [...initStack];
+  let ferror: any;
   let value: any;
   let reducing = true;
   let current = stack.pop();
-  let getNext = $next();
 
   while (current) {
-    let prog = current[Symbol.iterator]();
+    let prog = current;
     try {
       let next = getNext(prog);
+
       if (next.done) {
         value = next.value;
       } else {
-        let cont = {
-          [Symbol.iterator]: () => prog,
-        };
+        if (prog.method !== "next") continue;
         let control = next.value;
-        if (control.type === "continue") {
-          getNext = (iter) => iter.next(control.value);
-          let resolve = oneshot((v: T) => {
-            stack.push(_continue(() => cont, v));
-            if (reducing) return;
-            return reduce(stack);
-          });
-          let reject = oneshot((v: Error) => {
-            stack.push(_throw(() => cont, v));
-            if (reducing) return;
-            return reduce(stack);
-          });
-          stack.push(control.block(resolve, reject));
-        } else if (control.type === "throw") {
-          getNext = $throw(control.value);
-          stack.push(cont);
-        }
+        if (control.type === "reset") {
+          stack.push(
+            $next({
+              iterator: prog.iterator,
+              value: prog.value,
+            }),
+            $next({
+              iterator: control.block()[Symbol.iterator](),
+              value: void 0,
+            }),
+          );
+          continue;
+        } // implied: now contol.type must be "shift"
+
+        // force prog to be ThunkNext
+        if (prog.method !== "next") continue;
+
+        let resolve = oneshot((value: unknown) => {
+          stack.push(
+            $next({
+              iterator: prog.iterator,
+              value,
+            }),
+          );
+          return reduce(stack);
+        });
+        resolve.tail = oneshot((value: unknown) => {
+          stack.push(
+            $next({
+              iterator: prog.iterator,
+              value,
+            }),
+          );
+          if (!reducing) {
+            reduce(stack);
+          }
+        });
+        let reject = oneshot((error: Error) => {
+          stack.push(
+            $throw({
+              iterator: prog.iterator,
+              error,
+              caller: prog,
+            }),
+          );
+          if (!reducing) {
+            const res = reduce(stack);
+            return res;
+          }
+        });
+
+        stack.push(
+          $next({
+            iterator: control.block(resolve, reject)[Symbol.iterator](),
+            value: void 0,
+          }),
+        );
       }
     } catch (error) {
-      if (!stack.length) {
-        throw error;
+      ferror = error;
+
+      if (prog.method === "next") {
+        stack.push(
+          $throw({
+            iterator: prog.iterator,
+            error,
+            caller: prog,
+          }),
+        );
       } else {
-        getNext = $throw(error);
+        stack.push(
+          $next({
+            iterator: prog.iterator,
+            value: error,
+          }),
+        );
       }
     } finally {
       current = stack.pop();
     }
   }
 
+  if (ferror) {
+    throw ferror;
+  }
   reducing = false;
   return value;
 }
 
-function oneshot<T, R>(fn: Continuation<T, R>): Continuation<T, R> {
+function getNext(thunk: Thunk) {
+  let { iterator } = thunk;
+  if (thunk.method === "next") {
+    return iterator.next(thunk.value);
+  } else {
+    if (iterator.throw) {
+      return iterator.throw(thunk.error);
+    } else {
+      throw thunk.error;
+    }
+  }
+}
+
+function oneshot<T, R>(fn: Continuation<T, R>): ContinuationTail<T, R> {
   let continued = false;
   let result: any;
   return ((value) => {
     if (!continued) {
       continued = true;
-      return result = fn(value);
+      return (result = fn(value));
     } else {
       return result;
     }
-  }) as Continuation<T, R>;
+  }) as ContinuationTail<T, R>;
 }
-
-const $next = (value?: any) => (i: Iterator<Control>) => i.next(value);
-const $throw = (error: Error) => (i: Iterator<Control>) => {
-  if (i.throw) {
-    return i.throw(error);
-  } else {
-    throw error;
-  }
-};
 
 export type K<T = any, R = any> = Continuation<T, R>;
 
-export type Control<V = any> =
+export type Control =
   | {
-    type: "continue";
-    block(resolve?: Continuation, reject?: Continuation<Error>): Computation;
-    value: V | undefined;
+    type: "shift";
+    block(resolve: Continuation, reject: Continuation<Error>): Computation;
   }
-  | { type: "throw"; block(): Computation; value: Error };
+  | {
+    type: "reset";
+    block(): Computation;
+  };
