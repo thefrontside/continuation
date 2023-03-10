@@ -103,4 +103,17 @@ describe("continuation", () => {
     assertEquals("function", typeof k);
     assertEquals(10, k(5));
   });
+
+  it("can withstand stack overflow", () => {
+    function* run() {
+      for (let i = 0; i < 1_000_000; i++) {
+        yield* shift(function* (k) {
+          k.tail(1);
+        });
+      }
+    }
+
+    evaluate(run);
+    assertEquals(true, true);
+  });
 });
