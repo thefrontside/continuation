@@ -75,6 +75,19 @@ describe("error", () => {
     assertEquals({ caught: true, error }, reject(error));
   });
 
+  it("reject.tail should throw exception", () => {
+    assertThrows(
+      () =>
+        evaluate<K<Error>>(function* () {
+          yield* shift(function* (_, reject) {
+            return reject.tail(new Error("boom!"));
+          });
+        }),
+      Error,
+      "boom!",
+    );
+  });
+
   it("blows up the caller if it is not caught inside the continuation", () => {
     let reject = evaluate<K<Error>>(function* () {
       yield* shift(function* (_, reject) {

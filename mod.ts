@@ -172,7 +172,7 @@ function oneshot<T, R>(fn: Continuation<T, R>): ContinuationTail<T, R> {
   }) as ContinuationTail<T, R>;
 }
 
-export type K<T = any, R = any> = Continuation<T, R>;
+export type K<T = any, R = any> = ContinuationTail<T, R>;
 
 export type Control =
   | {
