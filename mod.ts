@@ -57,11 +57,20 @@ export function evaluate<T>(block: () => Computation, getNext = $next()): T {
 
 function oneshot<T, R>(fn: Continuation<T, R>): Continuation<T, R> {
   let continued = false;
+  let failure: { error: unknown };
   let result: any;
+
   return ((value) => {
     if (!continued) {
       continued = true;
-      return result = fn(value);
+      try {
+        return result = fn(value);
+      } catch (error) {
+        failure = { error };
+        throw error;
+      }
+    } else if (failure) {
+      throw failure.error;
     } else {
       return result;
     }

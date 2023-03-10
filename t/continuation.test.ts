@@ -1,5 +1,5 @@
 import { describe, it } from "./bdd.ts";
-import { assertEquals } from "./asserts.ts";
+import { assertEquals, assertThrows } from "./asserts.ts";
 import { Computation, evaluate, K, reset, shift } from "../mod.ts";
 
 describe("continuation", () => {
@@ -67,16 +67,8 @@ describe("continuation", () => {
       throw new Error(`bing ${++bing}`);
     });
 
-    try {
-      boom();
-    } catch (e) {
-      assertEquals("bing 1", e.message);
-    }
-    try {
-      boom();
-    } catch (e) {
-      assertEquals("bing 1", e.message);
-    }
+    assertThrows(boom, Error, "bing 1");
+    assertThrows(boom, Error, "bing 1");
   });
 
   it("can exit early from  recursion", () => {
