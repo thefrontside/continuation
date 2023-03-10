@@ -62,11 +62,8 @@ export function evaluate<T>(iterator: () => Computation): T {
   return reduce(stack);
 }
 
-function reduce<T>(initStack: Thunk[]): T {
-  let stack = [...initStack];
-  let ferror: any;
+function reduce<T>(stack: Thunk[]): T {
   let value: any;
-  let reducing = true;
   let current = stack.pop();
 
   while (current) {
@@ -76,97 +73,73 @@ function reduce<T>(initStack: Thunk[]): T {
       value = next.value;
 
       if (!next.done) {
-        if (prog.method !== "next") continue;
         let control = next.value;
         if (control.type === "reset") {
           stack.push(
-            $next({
-              iterator: prog.iterator,
-              value: prog.value,
-            }),
+            {
+              ...current,
+              method: "next",
+              get value() { return value },
+            },
             $next({
               iterator: control.block()[Symbol.iterator](),
               value: void 0,
             }),
           );
-          continue;
-        } // implied: now contol.type must be "shift"
-
-        // force prog to be ThunkNext
-        if (prog.method !== "next") continue;
-
-        let resolve = oneshot((v: unknown) => {
-          stack.push(
-            $next({
-              iterator: prog.iterator,
-              get value() {
-                return v;
-              },
-            }),
-          );
-          return reduce(stack);
-        });
-        resolve.tail = oneshot((v: unknown) => {
-          stack.push(
-            $next({
-              iterator: prog.iterator,
-              get value() {
-                return v;
-              },
-            }),
-          );
-          if (!reducing) {
-            reduce(stack);
-          }
-        });
-        let reject = oneshot((error: Error) => {
-          stack.push(
-            $throw({
-              iterator: prog.iterator,
-              error,
-              caller: prog,
-            }),
-          );
-          if (!reducing) {
+        } else {
+          let thunk = current;
+          let resolve = oneshot((v: unknown) => {
+            stack.push(
+              $next({
+                iterator: thunk.iterator,
+                value: v,
+              }),
+            );
             return reduce(stack);
-          }
-        });
+          });
+          // resolve.tail = oneshot((v: unknown) => {
+          //   stack.push(
+          //     $next({
+          //       iterator: prog.iterator,
+          //       value: v,
+          //     }),
+          //   );
+          //   if (!reducing) {
+          //     reduce(stack);
+          //   }
+          // });
+          let reject = oneshot((error: Error) => {
+            stack.push(
+              $throw({
+                iterator: prog.iterator,
+                error,
+                caller: prog,
+              }),
+            );
 
-        stack.push(
-          $next({
-            iterator: control.block(resolve, reject)[Symbol.iterator](),
-            value: void 0,
-          }),
-        );
+            return reduce(stack);
+          });
+
+          stack.push(
+            $next({
+              iterator: control.block(resolve, reject)[Symbol.iterator](),
+              value: void 0,
+            }),
+          );
+        }
       }
     } catch (error) {
-      ferror = error;
-
-      if (prog.method === "next") {
-        stack.push(
-          $throw({
-            iterator: prog.iterator,
-            error,
-            caller: prog,
-          }),
-        );
+      let top = stack.pop();
+      if (top) {
+        stack.push({...top, method: "throw", error });
       } else {
-        stack.push(
-          $next({
-            iterator: prog.iterator,
-            value: error,
-          }),
-        );
+        throw error;
       }
     } finally {
       current = stack.pop();
     }
   }
-
-  if (ferror) {
-    throw ferror;
-  }
-  reducing = false;
+  //reducing = false;
   return value;
 }
 
