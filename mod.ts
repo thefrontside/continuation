@@ -73,10 +73,9 @@ function reduce<T>(initStack: Thunk[]): T {
     let prog = current;
     try {
       let next = getNext(prog);
+      value = next.value;
 
-      if (next.done) {
-        value = next.value;
-      } else {
+      if (!next.done) {
         if (prog.method !== "next") continue;
         let control = next.value;
         if (control.type === "reset") {
@@ -96,20 +95,24 @@ function reduce<T>(initStack: Thunk[]): T {
         // force prog to be ThunkNext
         if (prog.method !== "next") continue;
 
-        let resolve = oneshot((value: unknown) => {
+        let resolve = oneshot((v: unknown) => {
           stack.push(
             $next({
               iterator: prog.iterator,
-              value,
+              get value() {
+                return v;
+              },
             }),
           );
           return reduce(stack);
         });
-        resolve.tail = oneshot((value: unknown) => {
+        resolve.tail = oneshot((v: unknown) => {
           stack.push(
             $next({
               iterator: prog.iterator,
-              value,
+              get value() {
+                return v;
+              },
             }),
           );
           if (!reducing) {
@@ -125,8 +128,7 @@ function reduce<T>(initStack: Thunk[]): T {
             }),
           );
           if (!reducing) {
-            const res = reduce(stack);
-            return res;
+            return reduce(stack);
           }
         });
 
