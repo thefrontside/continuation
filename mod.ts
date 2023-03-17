@@ -3,8 +3,7 @@
 interface Thunk<V = unknown> {
   method: "next" | "throw";
   iterator: Iterator<Control, unknown, unknown>;
-  value: V | Error;
-  caller?: Thunk;
+  value?: V | Error;
 }
 
 export interface Computation<T = any, C = Control> {
@@ -13,9 +12,6 @@ export interface Computation<T = any, C = Control> {
 
 export interface Continuation<T = any, R = any> {
   (value: T): R;
-}
-
-export interface ContinuationTail<T = any, R = any> extends Continuation<T, R> {
   tail(value: T): void;
 }
 
@@ -24,10 +20,7 @@ export function* reset<T>(block: () => Computation): Computation<T> {
 }
 
 export function* shift<T>(
-  block: (
-    resolve: ContinuationTail<T>,
-    reject: ContinuationTail<Error>,
-  ) => Computation,
+  block: (resolve: Continuation<T>, reject: Continuation<Error>) => Computation,
 ): Computation<T> {
   return yield { type: "shift", block };
 }
@@ -37,7 +30,6 @@ export function evaluate<T>(iterator: () => Computation): T {
     {
       method: "next" as const,
       iterator: iterator()[Symbol.iterator](),
-      value: undefined,
     },
   ];
   return reduce(stack);
@@ -68,7 +60,6 @@ function reduce<T>(stack: Thunk[]): T {
             {
               method: "next",
               iterator: control.block()[Symbol.iterator](),
-              value: void 0,
             },
           );
         } else {
@@ -81,11 +72,11 @@ function reduce<T>(stack: Thunk[]): T {
             });
             return reduce(stack);
           });
-          resolve.tail = oneshot((v: unknown) => {
+          resolve.tail = oneshot((value: unknown) => {
             stack.push({
               method: "next",
               iterator: prog.iterator,
-              value: v,
+              value,
             });
             if (!reducing) {
               reduce(stack);
@@ -96,7 +87,6 @@ function reduce<T>(stack: Thunk[]): T {
               method: "throw",
               iterator: prog.iterator,
               value: error,
-              caller: prog,
             });
             return reduce(stack);
           });
@@ -105,7 +95,6 @@ function reduce<T>(stack: Thunk[]): T {
               method: "throw",
               iterator: prog.iterator,
               value: error,
-              caller: prog,
             });
 
             if (!reducing) {
@@ -150,7 +139,7 @@ function getNext<V>(thunk: Thunk<V>) {
   }
 }
 
-function oneshot<T, R>(fn: Continuation<T, R>): ContinuationTail<T, R> {
+function oneshot<T, R>(fn: (t: T) => R): Continuation<T, R> {
   let continued = false;
   let failure: { error: unknown };
   let result: any;
@@ -159,7 +148,7 @@ function oneshot<T, R>(fn: Continuation<T, R>): ContinuationTail<T, R> {
     if (!continued) {
       continued = true;
       try {
-        return result = fn(value);
+        return (result = fn(value));
       } catch (error) {
         failure = { error };
         throw error;
@@ -169,18 +158,15 @@ function oneshot<T, R>(fn: Continuation<T, R>): ContinuationTail<T, R> {
     } else {
       return result;
     }
-  }) as ContinuationTail<T, R>;
+  }) as Continuation<T, R>;
 }
 
-export type K<T = any, R = any> = ContinuationTail<T, R>;
+export type K<T = any, R = any> = Continuation<T, R>;
 
 export type Control =
   | {
     type: "shift";
-    block(
-      resolve: ContinuationTail,
-      reject: ContinuationTail<Error>,
-    ): Computation;
+    block(resolve: Continuation, reject: Continuation<Error>): Computation;
   }
   | {
     type: "reset";
