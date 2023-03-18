@@ -6,6 +6,11 @@ interface Thunk<V = unknown> {
   value?: V | Error;
 }
 
+interface Stack {
+  reducing: boolean;
+  list: Thunk[];
+}
+
 export interface Computation<T = any, C = Control> {
   [Symbol.iterator](): Iterator<C, T, any>;
 }
@@ -26,19 +31,21 @@ export function* shift<T>(
 }
 
 export function evaluate<T>(iterator: () => Computation): T {
-  let stack = [
-    {
-      method: "next" as const,
-      iterator: iterator()[Symbol.iterator](),
-    },
-  ];
+  let stack: Stack = {
+    reducing: false,
+    list: [
+      {
+        method: "next" as const,
+        iterator: iterator()[Symbol.iterator](),
+      },
+    ],
+  };
   return reduce(stack);
 }
 
-function reduce<T>(stack: Thunk[]): T {
+function reduce<T>(stack: Stack): T {
   let value: any;
-  let current = stack.pop();
-  let reducing = true;
+  let current = stack.list.pop();
 
   while (current) {
     let prog = current;
@@ -49,7 +56,7 @@ function reduce<T>(stack: Thunk[]): T {
       if (!next.done) {
         let control = next.value;
         if (control.type === "reset") {
-          stack.push(
+          stack.list.push(
             {
               ...current,
               method: "next",
@@ -65,7 +72,7 @@ function reduce<T>(stack: Thunk[]): T {
         } else {
           let thunk = current;
           let resolve = oneshot((v: unknown) => {
-            stack.push({
+            stack.list.push({
               method: "next",
               iterator: thunk.iterator,
               value: v,
@@ -73,17 +80,18 @@ function reduce<T>(stack: Thunk[]): T {
             return reduce(stack);
           });
           resolve.tail = oneshot((value: unknown) => {
-            stack.push({
+            stack.list.push({
               method: "next",
               iterator: prog.iterator,
               value,
             });
-            if (!reducing) {
+            if (!stack.reducing) {
+              stack.reducing = true;
               reduce(stack);
             }
           });
           let reject = oneshot((error: Error) => {
-            stack.push({
+            stack.list.push({
               method: "throw",
               iterator: prog.iterator,
               value: error,
@@ -91,18 +99,19 @@ function reduce<T>(stack: Thunk[]): T {
             return reduce(stack);
           });
           reject.tail = oneshot((error: Error) => {
-            stack.push({
+            stack.list.push({
               method: "throw",
               iterator: prog.iterator,
               value: error,
             });
 
-            if (!reducing) {
+            if (!stack.reducing) {
+              stack.reducing = true;
               reduce(stack);
             }
           });
 
-          stack.push({
+          stack.list.push({
             method: "next",
             iterator: control.block(resolve, reject)[Symbol.iterator](),
             value: void 0,
@@ -110,18 +119,18 @@ function reduce<T>(stack: Thunk[]): T {
         }
       }
     } catch (error) {
-      let top = stack.pop();
+      let top = stack.list.pop();
       if (top) {
-        stack.push({ ...top, method: "throw", value: error });
+        stack.list.push({ ...top, method: "throw", value: error });
       } else {
         throw error;
       }
     } finally {
-      current = stack.pop();
+      current = stack.list.pop();
     }
   }
 
-  reducing = false;
+  stack.reducing = false;
   return value;
 }
 
