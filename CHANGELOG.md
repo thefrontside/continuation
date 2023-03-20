@@ -1,6 +1,14 @@
 # Changelog
 
+## \[0.1.5]
+
 - migrate from Deno.test to BDD https://deno.com/blog/v1.21#bdd-style-testing
+- fix bug where continuations were not re-raising the same error when invoked
+  multiple times https://github.com/thefrontside/continuation/pull/9
+- add a `.tail()` method to both `resolve` and `reject` continuations that will
+  re-use the currently executing reduction loop rather than calling reduce
+  recursively and adding another JS call frame to the stack.
+  https://github.com/thefrontside/continuation/pull/11
 
 ## \[0.1.4]
 
