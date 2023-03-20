@@ -75,6 +75,19 @@ describe("error", () => {
     assertEquals({ caught: true, error }, reject(error));
   });
 
+  it("reject.tail should throw exception", () => {
+    assertThrows(
+      () =>
+        evaluate<K<Error>>(function* () {
+          yield* shift(function* (_, reject) {
+            return reject.tail(new Error("boom!"));
+          });
+        }),
+      Error,
+      "boom!",
+    );
+  });
+
   it("blows up the caller if it is not caught inside the continuation", () => {
     let reject = evaluate<K<Error>>(function* () {
       yield* shift(function* (_, reject) {
@@ -83,5 +96,26 @@ describe("error", () => {
     });
 
     assertThrows(() => reject(new Error("boom!")), Error, "boom!");
+  });
+
+  it("can tail resume even when a stack blows up", () => {
+    let things = evaluate<{ one: K<void>; two: K<void> }>(function* () {
+      let one = yield* reset(function* () {
+        yield* shift(function* (resolve) {
+          return resolve.tail;
+        });
+        throw new Error("boom 1!");
+      });
+      let two = yield* reset(function* () {
+        yield* shift(function* (resolve) {
+          return resolve.tail;
+        });
+        throw new Error("boom 2!");
+      });
+      return { one, two };
+    });
+
+    assertThrows(() => things.one(), Error, "boom 1!");
+    assertThrows(() => things.two(), Error, "boom 2!");
   });
 });
