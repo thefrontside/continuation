@@ -34,6 +34,7 @@ await build({
     engines: {
       node: ">= 14",
     },
+    sideEffects: false,
   },
 });
 
