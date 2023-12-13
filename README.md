@@ -1,6 +1,6 @@
 # Continuation
 
-Delimited continuations for JavaScript
+[Delimited continuations])(https://en.wikipedia.org/wiki/Delimited_continuation) for JavaScript
 
 ## Install
 
