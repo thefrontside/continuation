@@ -1,4 +1,4 @@
-import { evaluate, K, reset, shift } from "../mod.ts";
+import { Continuation, evaluate, reset, shift } from "../mod.ts";
 import { assertEquals, assertObjectMatch, assertThrows } from "./asserts.ts";
 import { describe, it } from "./bdd.ts";
 
@@ -60,7 +60,7 @@ describe("error", () => {
   });
 
   it("can be raised programatically from a shift", () => {
-    let reject = evaluate<K<Error>>(function* () {
+    let reject = evaluate<Continuation<Error>>(function* () {
       try {
         yield* shift(function* (_, reject) {
           return reject;
@@ -72,50 +72,20 @@ describe("error", () => {
 
     let error = new Error("boom!");
 
-    assertEquals({ caught: true, error }, reject(error));
-  });
-
-  it("reject.tail should throw exception", () => {
-    assertThrows(
-      () =>
-        evaluate<K<Error>>(function* () {
-          yield* shift(function* (_, reject) {
-            return reject.tail(new Error("boom!"));
-          });
-        }),
-      Error,
-      "boom!",
-    );
+    assertEquals({ caught: true, error }, evaluate(() => reject(error)));
   });
 
   it("blows up the caller if it is not caught inside the continuation", () => {
-    let reject = evaluate<K<Error>>(function* () {
+    let reject = evaluate<Continuation<Error>>(function* () {
       yield* shift(function* (_, reject) {
         return reject;
       });
     });
 
-    assertThrows(() => reject(new Error("boom!")), Error, "boom!");
-  });
-
-  it("can tail resume even when a stack blows up", () => {
-    let things = evaluate<{ one: K<void>; two: K<void> }>(function* () {
-      let one = yield* reset(function* () {
-        yield* shift(function* (resolve) {
-          return resolve.tail;
-        });
-        throw new Error("boom 1!");
-      });
-      let two = yield* reset(function* () {
-        yield* shift(function* (resolve) {
-          return resolve.tail;
-        });
-        throw new Error("boom 2!");
-      });
-      return { one, two };
-    });
-
-    assertThrows(() => things.one(), Error, "boom 1!");
-    assertThrows(() => things.two(), Error, "boom 2!");
+    assertThrows(
+      () => evaluate(() => reject(new Error("boom!"))),
+      Error,
+      "boom!",
+    );
   });
 });
