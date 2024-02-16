@@ -1,6 +1,6 @@
 import { describe, it } from "./bdd.ts";
 import { assertEquals, assertThrows } from "./asserts.ts";
-import { Computation, evaluate, K, reset, shift } from "../mod.ts";
+import { Computation, Continuation, evaluate, reset, shift } from "../mod.ts";
 
 describe("continuation", () => {
   it("evaluates synchronous values synchronously", () => {
@@ -25,50 +25,54 @@ describe("continuation", () => {
 
   it("each continuation point function only resumes once", () => {
     let beginning, middle, end;
-    let next = evaluate<K<string, K<number>>>(function* () {
-      beginning = true;
-      middle = yield* shift(function* (k) {
-        return k;
-      });
-      end = yield* shift<number>(function* (k) {
-        return k;
-      });
-      return end * 10;
-    });
+    let next = evaluate<Continuation<string, Continuation<number>>>(
+      function* () {
+        beginning = true;
+        middle = yield* shift(function* (k) {
+          return k;
+        });
+        end = yield* shift<number>(function* (k) {
+          return k;
+        });
+        return end * 10;
+      },
+    );
 
     assertEquals(true, beginning);
     assertEquals(undefined, middle);
 
-    let last = next("reached middle");
+    let last = evaluate<(val: number) => Computation<number>>(() =>
+      next("reached middle")
+    );
     assertEquals("reached middle", middle);
     assertEquals(undefined, end);
     assertEquals("function", typeof last);
 
-    let second = next("continue");
+    let second = evaluate(() => next("continue"));
     assertEquals("reached middle", middle);
     assertEquals(undefined, end);
-    assertEquals(last, second);
+    assertEquals(void 0, second);
 
-    let result = last(10);
+    let result = evaluate(() => last(10));
     assertEquals(10, end);
     assertEquals(100, result);
 
-    let result2 = last(100);
+    let result2 = evaluate(() => last(100));
     assertEquals(10, end);
-    assertEquals(100, result2);
+    assertEquals(undefined, result2);
   });
 
   it("each continuation point only fails once", () => {
     let bing = 0;
-    let boom = evaluate<K<void>>(function* () {
+    let boom = evaluate<Continuation<void>>(function* () {
       yield* shift(function* (k) {
         return k;
       });
       throw new Error(`bing ${++bing}`);
     });
 
-    assertThrows(boom, Error, "bing 1");
-    assertThrows(boom, Error, "bing 1");
+    assertThrows(() => evaluate(() => boom()), Error, "bing 1");
+    assertEquals(undefined, evaluate(() => boom()));
   });
 
   it("can exit early from  recursion", () => {
@@ -89,31 +93,32 @@ describe("continuation", () => {
   });
 
   it("returns the value of the following shift point when continuing ", () => {
-    let { k } = evaluate<{ k: K }>(function* () {
+    let { k } = evaluate<{ k: Continuation<unknown> }>(function* () {
       let k = yield* reset(function* () {
-        let result = yield* shift(function* (k) {
+        let result = yield* shift<number>(function* (k) {
           return k;
         });
-        yield* shift(function* () {
+
+        return yield* shift(function* () {
           return result * 2;
         });
       });
       return { k };
     });
     assertEquals("function", typeof k);
-    assertEquals(10, k(5));
+    assertEquals(10, evaluate(() => k(5)));
   });
 
   it("can withstand stack overflow", () => {
-    function* run() {
+    let result = evaluate(function* run() {
+      let sum = 0;
       for (let i = 0; i < 100_000; i++) {
-        yield* shift(function* (k) {
-          k.tail(1);
+        sum += yield* shift<1>(function* incr(k) {
+          return yield* k(1);
         });
       }
-    }
-
-    evaluate(run);
-    assertEquals(true, true);
+      return sum;
+    });
+    assertEquals(result, 100_000);
   });
 });
