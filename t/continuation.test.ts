@@ -121,4 +121,21 @@ describe("continuation", () => {
     });
     assertEquals(result, 100_000);
   });
+
+  it.ignore("returns the value of next shift point", () => {
+    let finallyBlock = false;
+    let result = "not computed";
+
+    let x = evaluate(function* () {
+      yield* shift<void, string>(function* (k) {
+        result = yield* k();
+      });
+      yield* shift<void>(function* () {
+        return "X";
+      });
+      return "Hello World";
+    });
+    assertEquals(result, "Hello World");
+    assertEquals(finallyBlock, true);
+  });
 });
