@@ -1,0 +1,5 @@
+{
+  "name": "@frontside/continuation",
+  "version": "0.1.6",
+  "exports": "./mod.ts"
+}
